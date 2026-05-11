@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "app.olauncher"
+        applicationId "app.omglauncher"
         minSdkVersion 24
         targetSdkVersion 35
         versionCode 105
@@ -41,7 +41,7 @@ android {
         viewBinding = true
         buildConfig = true
     }
-    namespace 'app.olauncher'
+    namespace 'app.omglauncher'
 }
 
 dependencies {

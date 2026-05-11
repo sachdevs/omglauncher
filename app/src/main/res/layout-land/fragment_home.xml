@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:animateLayoutChanges="true"
+    android:background="@color/white"
     android:orientation="vertical"
     tools:context=".ui.HomeFragment">
 
@@ -36,17 +37,16 @@
 
         <TextClock
             android:id="@+id/clock"
-            style="@style/TextDefault"
+            style="@style/HomeTextDefault"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-light"
             android:format12Hour="h:mm"
             android:textSize="@dimen/time_size"
             tools:text="02:34" />
 
         <TextView
             android:id="@+id/date"
-            style="@style/TextDefault"
+            style="@style/HomeTextDefault"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:format12Hour="EEE, dd MMM"
@@ -59,7 +59,7 @@
     <!-- Screen time-->
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvScreenTime"
-        style="@style/TextSmall"
+        style="@style/HomeTextSmall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="end"
@@ -84,7 +84,7 @@
 
         <TextView
             android:id="@+id/homeApp1"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -95,7 +95,7 @@
 
         <TextView
             android:id="@+id/homeApp2"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -106,7 +106,7 @@
 
         <TextView
             android:id="@+id/homeApp3"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -117,7 +117,7 @@
 
         <TextView
             android:id="@+id/homeApp4"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -128,7 +128,7 @@
 
         <TextView
             android:id="@+id/homeApp5"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -139,7 +139,7 @@
 
         <TextView
             android:id="@+id/homeApp6"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -150,7 +150,7 @@
 
         <TextView
             android:id="@+id/homeApp7"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -161,7 +161,7 @@
 
         <TextView
             android:id="@+id/homeApp8"
-            style="@style/TextLarge"
+            style="@style/HomeTextLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:hint="@string/app"
@@ -174,7 +174,7 @@
 
     <TextView
         android:id="@+id/firstRunTips"
-        style="@style/TextSmall"
+        style="@style/HomeTextSmall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
@@ -185,7 +185,7 @@
     <!-- Set default launcher -->
     <TextView
         android:id="@+id/setDefaultLauncher"
-        style="@style/TextMedium"
+        style="@style/HomeTextMedium"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
