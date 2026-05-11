@@ -5,17 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.bundleOf
@@ -28,6 +33,8 @@ import androidx.navigation.fragment.findNavController
 import app.omglauncher.MainViewModel
 import app.omglauncher.R
 import app.omglauncher.data.AppModel
+import app.omglauncher.data.BeeminderDashboardState
+import app.omglauncher.data.BeeminderGoalSummary
 import app.omglauncher.data.Constants
 import app.omglauncher.data.Prefs
 import app.omglauncher.databinding.FragmentHomeBinding
@@ -49,12 +56,15 @@ import app.omglauncher.listener.ViewSwipeTouchListener
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener {
 
     private lateinit var prefs: Prefs
     private lateinit var viewModel: MainViewModel
     private lateinit var deviceManager: DevicePolicyManager
+    private lateinit var leftBlankPageBackCallback: OnBackPressedCallback
+    private var isLeftBlankPageVisible = false
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
@@ -77,10 +87,15 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         setHomeAlignment(prefs.homeAlignment)
         initSwipeTouchListener()
         initClickListeners()
+        initLeftBlankPageBackHandler()
     }
 
     override fun onResume() {
         super.onResume()
+        isLeftBlankPageVisible = false
+        leftBlankPageBackCallback.isEnabled = false
+        binding.blankPageLayout.visibility = View.GONE
+        binding.homeAppsLayout.visibility = View.VISIBLE
         populateHomeScreen(false)
         viewModel.isOmglauncherDefault()
         if (prefs.showStatusBar) showStatusBar()
@@ -175,13 +190,11 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     }
 
     private fun initObservers() {
-        if (prefs.firstSettingsOpen) {
-            binding.firstRunTips.visibility = View.VISIBLE
-            binding.setDefaultLauncher.visibility = View.GONE
-        } else binding.firstRunTips.visibility = View.GONE
+        updateHomeFooterVisibility()
 
         viewModel.refreshHome.observe(viewLifecycleOwner) {
             populateHomeScreen(it)
+            if (isLeftBlankPageVisible) hideHomeContentForLeftBlankPage()
         }
         viewModel.isOmglauncherDefault.observe(viewLifecycleOwner, Observer {
             if (it != true) {
@@ -192,8 +205,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 prefs.homeBottomAlignment = false
                 setHomeAlignment()
             }
-            if (binding.firstRunTips.isVisible) return@Observer
-            binding.setDefaultLauncher.isVisible = it.not() && prefs.hideSetDefaultLauncher.not()
+            updateHomeFooterVisibility()
         })
         viewModel.homeAppAlignment.observe(viewLifecycleOwner) {
             setHomeAlignment(it)
@@ -207,11 +219,18 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         viewModel.showRecentApps.observe(viewLifecycleOwner) {
             binding.recents.performClick()
         }
+        viewModel.beeminderDashboardState.observe(viewLifecycleOwner) {
+            populateBeeminderDashboard(it)
+        }
     }
 
     private fun initSwipeTouchListener() {
         val context = requireContext()
         binding.mainLayout.setOnTouchListener(getSwipeGestureListener(context))
+        binding.blankPageLayout.setOnTouchListener(getSwipeGestureListener(context))
+        binding.beeminderTopLayout.setOnTouchListener(getSwipeGestureListener(context))
+        binding.beeminderGoalsLayout.setOnTouchListener(getSwipeGestureListener(context))
+        binding.blankPageBottomLayout.setOnTouchListener(getSwipeGestureListener(context))
         binding.homeApp1.setOnTouchListener(getViewSwipeTouchListener(context, binding.homeApp1))
         binding.homeApp2.setOnTouchListener(getViewSwipeTouchListener(context, binding.homeApp2))
         binding.homeApp3.setOnTouchListener(getViewSwipeTouchListener(context, binding.homeApp3))
@@ -233,6 +252,15 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         binding.setDefaultLauncher.setOnLongClickListener(this)
         binding.tvScreenTime.setOnClickListener(this)
         binding.tvScreenTime.setOnLongClickListener(this)
+    }
+
+    private fun initLeftBlankPageBackHandler() {
+        leftBlankPageBackCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                restoreHomeFromLeftBlankPage()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, leftBlankPageBackCallback)
     }
 
     private fun setHomeAlignment(horizontalGravity: Int = prefs.homeAlignment) {
@@ -415,6 +443,228 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         binding.homeApp6.visibility = View.GONE
         binding.homeApp7.visibility = View.GONE
         binding.homeApp8.visibility = View.GONE
+    }
+
+    private fun updateHomeFooterVisibility() {
+        if (isLeftBlankPageVisible) {
+            binding.firstRunTips.visibility = View.GONE
+            binding.setDefaultLauncher.visibility = View.GONE
+            return
+        }
+
+        if (prefs.firstSettingsOpen) {
+            binding.firstRunTips.visibility = View.VISIBLE
+            binding.setDefaultLauncher.visibility = View.GONE
+        } else {
+            binding.firstRunTips.visibility = View.GONE
+            binding.setDefaultLauncher.isVisible =
+                viewModel.isOmglauncherDefault.value != true && prefs.hideSetDefaultLauncher.not()
+        }
+    }
+
+    private fun hideHomeContentForLeftBlankPage() {
+        binding.dateTimeLayout.visibility = View.GONE
+        binding.tvScreenTime.visibility = View.GONE
+        binding.homeAppsLayout.visibility = View.GONE
+        binding.firstRunTips.visibility = View.GONE
+        binding.setDefaultLauncher.visibility = View.GONE
+        binding.blankPageLayout.visibility = View.VISIBLE
+    }
+
+    private fun showLeftBlankPage() {
+        isLeftBlankPageVisible = true
+        leftBlankPageBackCallback.isEnabled = true
+        hideHomeContentForLeftBlankPage()
+        viewModel.refreshBeeminderGoals()
+    }
+
+    private fun restoreHomeFromLeftBlankPage() {
+        if (!isLeftBlankPageVisible) return
+
+        isLeftBlankPageVisible = false
+        leftBlankPageBackCallback.isEnabled = false
+        binding.blankPageLayout.visibility = View.GONE
+        binding.homeAppsLayout.visibility = View.VISIBLE
+        populateHomeScreen(false)
+        updateHomeFooterVisibility()
+    }
+
+    private fun openSwipeLeftAppOrBlankPage() {
+        if (!prefs.swipeLeftEnabled) return
+
+        if (isLeftBlankPageVisible) {
+            restoreHomeFromLeftBlankPage()
+            openSwipeLeftApp()
+        } else {
+            showLeftBlankPage()
+        }
+    }
+
+    private fun openSwipeRightAppOrRestoreHome() {
+        if (isLeftBlankPageVisible) {
+            restoreHomeFromLeftBlankPage()
+            return
+        }
+
+        openSwipeRightApp()
+    }
+
+    private fun populateBeeminderDashboard(state: BeeminderDashboardState) {
+        binding.beeminderGoalsLayout.removeAllViews()
+        binding.beeminderMessage.visibility = View.GONE
+        binding.beeminderTitle.text = getString(R.string.beeminder)
+        binding.beeminderStatus.text = ""
+
+        when (state) {
+            BeeminderDashboardState.NotConfigured -> showBeeminderMessage(R.string.beeminder_not_configured)
+            BeeminderDashboardState.Loading -> showBeeminderMessage(R.string.beeminder_loading)
+            is BeeminderDashboardState.Loaded -> populateBeeminderGoals(state)
+            is BeeminderDashboardState.Error -> {
+                state.cached?.let { populateBeeminderGoals(it.copy(stale = true)) }
+                    ?: showBeeminderMessage(R.string.beeminder_load_failed)
+                binding.beeminderStatus.text = getString(R.string.beeminder_offline)
+            }
+        }
+    }
+
+    private fun populateBeeminderGoals(state: BeeminderDashboardState.Loaded) {
+        if (state.goals.isEmpty()) {
+            binding.beeminderStatus.text = getString(R.string.beeminder_active_count, 0)
+            showBeeminderMessage(R.string.beeminder_no_active_goals)
+            return
+        }
+
+        val firstGoal = state.goals.first()
+        val statusText = if (state.stale) getString(R.string.beeminder_stale) else dueText(firstGoal)
+        binding.beeminderStatus.text = getString(
+            R.string.beeminder_active_count_status,
+            state.totalActiveGoals,
+            statusText
+        )
+
+        val visibleGoals = state.goals.take(maxVisibleBeeminderGoals())
+        visibleGoals.forEach { goal ->
+            binding.beeminderGoalsLayout.addView(createBeeminderGoalRow(goal))
+        }
+
+        val hiddenCount = state.totalActiveGoals - visibleGoals.size
+        if (hiddenCount > 0) {
+            binding.beeminderGoalsLayout.addView(createBeeminderOverflowRow(hiddenCount))
+        }
+    }
+
+    private fun showBeeminderMessage(messageRes: Int) {
+        binding.beeminderMessage.setText(messageRes)
+        binding.beeminderMessage.visibility = View.VISIBLE
+    }
+
+    private fun createBeeminderGoalRow(goal: BeeminderGoalSummary): View {
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        row.addView(View(requireContext()).apply {
+            background = safetyCircle(goal)
+            layoutParams = LinearLayout.LayoutParams(12.dpToPx(), 12.dpToPx()).apply {
+                marginEnd = 10.dpToPx()
+            }
+        })
+
+        val textColumn = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        textColumn.addView(homeText(goal.slug, bold = true))
+        textColumn.addView(homeText(goal.limitSummary.ifBlank { dueText(goal) }, secondary = true))
+        row.addView(textColumn)
+
+        val metaText = listOfNotNull(
+            if (goal.pledge > 0) "\$${goal.pledge.toInt()}" else null,
+            dueText(goal)
+        ).joinToString("  ")
+        row.addView(homeText(metaText, secondary = true).apply {
+            gravity = Gravity.END
+            maxLines = 1
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = 8.dpToPx()
+            }
+        })
+
+        return row
+    }
+
+    private fun createBeeminderOverflowRow(hiddenCount: Int): View {
+        return homeText(getString(R.string.beeminder_more_safe, hiddenCount), secondary = true).apply {
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+    }
+
+    private fun homeText(textValue: String, bold: Boolean = false, secondary: Boolean = false): TextView {
+        return TextView(requireContext()).apply {
+            setTextAppearance(if (bold) R.style.HomeTextSmallBold else R.style.HomeTextSmall)
+            text = textValue
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            if (secondary) setTextColor(requireContext().getColor(R.color.blackTrans50))
+        }
+    }
+
+    private fun safetyCircle(goal: BeeminderGoalSummary): GradientDrawable {
+        val color = Color.parseColor(
+            when (goal.colorKey.ifBlank { colorKeyFromSafeBuffer(goal.safeBuffer) }) {
+                "red" -> "#E53935"
+                "orange" -> "#FB8C00"
+                "blue" -> "#3F51B5"
+                "green" -> "#2E7D32"
+                "darkgreen", "dkgreen" -> "#1B5E20"
+                else -> "#9E9E9E"
+            }
+        )
+        return GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke(2.dpToPx(), color)
+        }
+    }
+
+    private fun colorKeyFromSafeBuffer(safeBuffer: Int): String {
+        return when {
+            safeBuffer < 1 -> "red"
+            safeBuffer < 2 -> "orange"
+            safeBuffer < 3 -> "blue"
+            safeBuffer < 7 -> "green"
+            else -> "darkgreen"
+        }
+    }
+
+    private fun dueText(goal: BeeminderGoalSummary): String {
+        if (goal.loseDate <= 0L) return "${goal.safeBuffer}d"
+        val diffMs = goal.loseDate * 1000L - System.currentTimeMillis()
+        if (diffMs <= 0) return getString(R.string.beeminder_due_now)
+        val days = TimeUnit.MILLISECONDS.toDays(diffMs)
+        return when {
+            days == 0L -> getString(R.string.beeminder_due_today)
+            days == 1L -> getString(R.string.beeminder_due_tomorrow)
+            else -> getString(R.string.beeminder_due_in_days, days)
+        }
+    }
+
+    private fun maxVisibleBeeminderGoals(): Int {
+        return if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 4 else 5
     }
 
     private fun launchAppOrShortcut(
@@ -630,12 +880,12 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         return object : OnSwipeTouchListener(context) {
             override fun onSwipeLeft() {
                 super.onSwipeLeft()
-                openSwipeLeftApp()
+                openSwipeLeftAppOrBlankPage()
             }
 
             override fun onSwipeRight() {
                 super.onSwipeRight()
-                openSwipeRightApp()
+                openSwipeRightAppOrRestoreHome()
             }
 
             override fun onSwipeUp() {
@@ -678,12 +928,12 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         return object : ViewSwipeTouchListener(context, view) {
             override fun onSwipeLeft() {
                 super.onSwipeLeft()
-                openSwipeLeftApp()
+                openSwipeLeftAppOrBlankPage()
             }
 
             override fun onSwipeRight() {
                 super.onSwipeRight()
-                openSwipeRightApp()
+                openSwipeRightAppOrRestoreHome()
             }
 
             override fun onSwipeUp() {

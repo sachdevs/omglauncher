@@ -172,6 +172,77 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/blankPageLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/white"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/beeminderTopLayout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="56dp"
+            android:paddingBottom="16dp">
+
+            <LinearLayout
+                android:id="@+id/beeminderHeaderLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/beeminderTitle"
+                    style="@style/HomeTextMedium"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:text="@string/beeminder"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/beeminderStatus"
+                    style="@style/HomeTextSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    tools:text="4 active" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/beeminderGoalsLayout"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/beeminderMessage"
+                style="@style/HomeTextSmall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingVertical="8dp"
+                android:visibility="gone"
+                tools:text="Configure Beeminder in settings"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/blankPageBottomLayout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/firstRunTips"
         style="@style/HomeTextSmall"

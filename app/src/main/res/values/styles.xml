@@ -124,4 +124,11 @@
         <item name="android:shadowRadius">0</item>
     </style>
 
+    <style name="HomeTextSmallBold" parent="TextSmallBold">
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textColorHint">@color/blackTrans80</item>
+        <item name="android:shadowColor">@android:color/transparent</item>
+        <item name="android:shadowRadius">0</item>
+    </style>
+
 </resources>

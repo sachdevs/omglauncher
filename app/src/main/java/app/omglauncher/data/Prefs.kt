@@ -43,6 +43,10 @@ class Prefs(context: Context) {
     private val LAUNCHER_RESTART_TIMESTAMP = "LAUNCHER_RECREATE_TIMESTAMP"
     private val SHOWN_ON_DAY_OF_YEAR = "SHOWN_ON_DAY_OF_YEAR"
     private val HOME_BUTTON_SHOW_RECENTS = "HOME_BUTTON_SHOW_RECENTS"
+    private val BEEMINDER_ACCESS_TOKEN = "BEEMINDER_ACCESS_TOKEN"
+    private val BEEMINDER_USERNAME = "BEEMINDER_USERNAME"
+    private val BEEMINDER_GOALS_CACHE = "BEEMINDER_GOALS_CACHE"
+    private val BEEMINDER_LAST_FETCH_TIME = "BEEMINDER_LAST_FETCH_TIME"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -222,6 +226,22 @@ class Prefs(context: Context) {
     var homeButtonShowRecents: Boolean
         get() = prefs.getBoolean(HOME_BUTTON_SHOW_RECENTS, false)
         set(value) = prefs.edit { putBoolean(HOME_BUTTON_SHOW_RECENTS, value).apply() }
+
+    var beeminderAccessToken: String
+        get() = prefs.getString(BEEMINDER_ACCESS_TOKEN, "").toString()
+        set(value) = prefs.edit { putString(BEEMINDER_ACCESS_TOKEN, value).apply() }
+
+    var beeminderUsername: String
+        get() = prefs.getString(BEEMINDER_USERNAME, "").toString()
+        set(value) = prefs.edit { putString(BEEMINDER_USERNAME, value).apply() }
+
+    var beeminderGoalsCache: String
+        get() = prefs.getString(BEEMINDER_GOALS_CACHE, "").toString()
+        set(value) = prefs.edit { putString(BEEMINDER_GOALS_CACHE, value).apply() }
+
+    var beeminderLastFetchTime: Long
+        get() = prefs.getLong(BEEMINDER_LAST_FETCH_TIME, 0L)
+        set(value) = prefs.edit { putLong(BEEMINDER_LAST_FETCH_TIME, value).apply() }
 
     var hiddenApps: MutableSet<String>
         get() = prefs.getStringSet(HIDDEN_APPS, mutableSetOf()) as MutableSet<String>

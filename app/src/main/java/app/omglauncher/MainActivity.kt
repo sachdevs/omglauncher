@@ -8,11 +8,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -109,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         initObservers(viewModel)
         viewModel.getAppList()
         setupOrientation()
+        handleBeeminderOAuthIntent(intent)
 
         window.addFlags(FLAG_LAYOUT_NO_LIMITS)
 
@@ -150,9 +153,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onNewIntent(intent: Intent?) {
+        setIntent(intent)
+        val handledOAuth = handleBeeminderOAuthIntent(intent)
         val alreadyHome = navController.currentDestination?.id == R.id.mainFragment
         backToHomeScreen()
-        if (alreadyHome && isResumed && prefs.homeButtonShowRecents)
+        if (!handledOAuth && alreadyHome && isResumed && prefs.homeButtonShowRecents)
             viewModel.showRecentApps.call()
         super.onNewIntent(intent)
     }
@@ -333,6 +338,34 @@ class MainActivity : AppCompatActivity() {
         binding.messageLayout.visibility = View.GONE
         if (navController.currentDestination?.id != R.id.mainFragment)
             navController.popBackStack(R.id.mainFragment, false)
+    }
+
+    private fun handleBeeminderOAuthIntent(intent: Intent?): Boolean {
+        val data = intent?.data ?: return false
+        if (data.scheme != "omglauncher" || data.host != "beeminder" || data.path != "/oauth") return false
+
+        val accessToken = getOAuthParameter(data, "access_token")
+        val username = getOAuthParameter(data, "username")
+        if (accessToken.isBlank()) {
+            showToast(getString(R.string.beeminder_oauth_failed), Toast.LENGTH_LONG)
+            return true
+        }
+
+        viewModel.saveBeeminderAccessToken(accessToken, username)
+        showToast(getString(R.string.beeminder_connected))
+        return true
+    }
+
+    private fun getOAuthParameter(data: Uri, name: String): String {
+        val queryValue = data.getQueryParameter(name)
+        if (!queryValue.isNullOrBlank()) return queryValue
+
+        return data.fragment
+            ?.split("&")
+            ?.firstOrNull { it.substringBefore("=") == name }
+            ?.substringAfter("=", "")
+            ?.let { Uri.decode(it) }
+            .orEmpty()
     }
 
     private fun setPlainWallpaper() {

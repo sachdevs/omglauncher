@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -83,6 +84,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         populateStatusBar()
         populateDateTime()
         populateSwipeApps()
+        populateBeeminderToken()
         populateSwipeDownAction()
         populateActionHints()
         initClickListeners()
@@ -154,6 +156,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
 
             R.id.swipeLeftApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_LEFT_APP)
             R.id.swipeRightApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_RIGHT_APP)
+            R.id.beeminderTokenRow, R.id.configureBeeminderToken -> connectOrDisconnectBeeminder()
             R.id.swipeDownAction -> binding.swipeDownSelectLayout.visibility = View.VISIBLE
             R.id.notifications -> updateSwipeDownAction(Constants.SwipeDownAction.NOTIFICATIONS)
             R.id.search -> updateSwipeDownAction(Constants.SwipeDownAction.SEARCH)
@@ -227,6 +230,8 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.dateOnly.setOnClickListener(this)
         binding.swipeLeftApp.setOnClickListener(this)
         binding.swipeRightApp.setOnClickListener(this)
+        binding.beeminderTokenRow.setOnClickListener(this)
+        binding.configureBeeminderToken.setOnClickListener(this)
         binding.swipeDownAction.setOnClickListener(this)
         binding.search.setOnClickListener(this)
         binding.notifications.setOnClickListener(this)
@@ -634,6 +639,34 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             binding.swipeLeftApp.setTextColor(requireContext().getColorFromAttr(R.attr.primaryColorTrans50))
         if (!prefs.swipeRightEnabled)
             binding.swipeRightApp.setTextColor(requireContext().getColorFromAttr(R.attr.primaryColorTrans50))
+    }
+
+    private fun populateBeeminderToken() {
+        binding.configureBeeminderToken.text = getString(
+            if (prefs.beeminderAccessToken.isBlank()) R.string.off else R.string.on
+        )
+    }
+
+    private fun connectOrDisconnectBeeminder() {
+        if (prefs.beeminderAccessToken.isNotBlank()) {
+            viewModel.clearBeeminderAccessToken()
+            populateBeeminderToken()
+            requireContext().showToast(getString(R.string.beeminder_disconnected))
+            return
+        }
+
+        if (BuildConfig.BEEMINDER_CLIENT_ID.isBlank()) {
+            requireContext().showToast(getString(R.string.beeminder_client_not_configured), Toast.LENGTH_LONG)
+            return
+        }
+
+        val authUri = Uri.parse("https://www.beeminder.com/apps/authorize")
+            .buildUpon()
+            .appendQueryParameter("client_id", BuildConfig.BEEMINDER_CLIENT_ID)
+            .appendQueryParameter("redirect_uri", BuildConfig.BEEMINDER_REDIRECT_URI)
+            .appendQueryParameter("response_type", "token")
+            .build()
+        startActivity(Intent(Intent.ACTION_VIEW, authUri))
     }
 
 //    private fun populateDigitalWellbeing() {

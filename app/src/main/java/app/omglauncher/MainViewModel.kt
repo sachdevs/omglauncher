@@ -18,8 +18,10 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import app.omglauncher.data.AppModel
+import app.omglauncher.data.BeeminderDashboardState
 import app.omglauncher.data.Constants
 import app.omglauncher.data.Prefs
+import app.omglauncher.helper.BeeminderClient
 import app.omglauncher.helper.SingleLiveEvent
 import app.omglauncher.helper.WallpaperWorker
 import app.omglauncher.helper.formattedTimeSpent
@@ -51,6 +53,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val launcherResetFailed = MutableLiveData<Boolean>()
     val homeAppAlignment = MutableLiveData<Int>()
     val screenTimeValue = MutableLiveData<String>()
+    val beeminderDashboardState = MutableLiveData<BeeminderDashboardState>()
 
     val privateSpaceApps = MutableLiveData<List<AppModel>?>()
     val privateSpaceLocked = MutableLiveData<Boolean>()
@@ -456,6 +459,71 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val viewTimeSpent = appContext.formattedTimeSpent(timeSpent)
         screenTimeValue.postValue(viewTimeSpent)
         prefs.screenTimeLastUpdated = endTime
+    }
+
+    fun saveBeeminderAccessToken(accessToken: String, username: String) {
+        prefs.beeminderAccessToken = accessToken.trim()
+        prefs.beeminderUsername = username.trim()
+        prefs.beeminderGoalsCache = ""
+        prefs.beeminderLastFetchTime = 0L
+        refreshBeeminderGoals(force = true)
+    }
+
+    fun clearBeeminderAccessToken() {
+        prefs.beeminderAccessToken = ""
+        prefs.beeminderUsername = ""
+        prefs.beeminderGoalsCache = ""
+        prefs.beeminderLastFetchTime = 0L
+        beeminderDashboardState.value = BeeminderDashboardState.NotConfigured
+    }
+
+    fun refreshBeeminderGoals(force: Boolean = false) {
+        val accessToken = prefs.beeminderAccessToken
+        if (accessToken.isBlank()) {
+            beeminderDashboardState.value = BeeminderDashboardState.NotConfigured
+            return
+        }
+
+        val cachedState = getCachedBeeminderState(stale = false)
+        val cacheAge = System.currentTimeMillis() - prefs.beeminderLastFetchTime
+        if (!force && cachedState != null && cacheAge >= 0 && cacheAge < Constants.BEEMINDER_REFRESH_INTERVAL_MS) {
+            beeminderDashboardState.value = cachedState
+            return
+        }
+
+        beeminderDashboardState.value = cachedState ?: BeeminderDashboardState.Loading
+        viewModelScope.launch {
+            try {
+                val goals = BeeminderClient.fetchActiveGoals(accessToken)
+                prefs.beeminderGoalsCache = BeeminderClient.encodeGoals(goals)
+                prefs.beeminderLastFetchTime = System.currentTimeMillis()
+                beeminderDashboardState.value = BeeminderDashboardState.Loaded(
+                    goals = goals,
+                    totalActiveGoals = goals.size,
+                    updatedAtMs = prefs.beeminderLastFetchTime,
+                )
+            } catch (e: Exception) {
+                beeminderDashboardState.value = BeeminderDashboardState.Error(
+                    message = e.message ?: appContext.getString(R.string.beeminder_load_failed),
+                    cached = getCachedBeeminderState(stale = true)
+                )
+            }
+        }
+    }
+
+    private fun getCachedBeeminderState(stale: Boolean): BeeminderDashboardState.Loaded? {
+        return try {
+            val goals = BeeminderClient.decodeGoals(prefs.beeminderGoalsCache)
+            if (goals.isEmpty() && prefs.beeminderGoalsCache.isBlank()) return null
+            BeeminderDashboardState.Loaded(
+                goals = goals,
+                totalActiveGoals = goals.size,
+                updatedAtMs = prefs.beeminderLastFetchTime,
+                stale = stale,
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun getPrivateSpaceAppList() {

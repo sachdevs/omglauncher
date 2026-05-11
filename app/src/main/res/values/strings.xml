@@ -27,6 +27,25 @@
     <string name="app_text_color">Text color</string>
     <string name="double_tap_to_lock_screen">Double tap to lock</string>
     <string name="home_button_show_recents">Home button for recents</string>
+    <string name="beeminder" translatable="false">Beeminder</string>
+    <string name="connect_beeminder">Connect Beeminder</string>
+    <string name="beeminder_connected">Beeminder connected</string>
+    <string name="beeminder_disconnected">Beeminder disconnected</string>
+    <string name="beeminder_client_not_configured">Add beeminder.clientId to local.properties</string>
+    <string name="beeminder_oauth_failed">Unable to connect Beeminder</string>
+    <string name="beeminder_not_configured">Configure Beeminder in settings</string>
+    <string name="beeminder_loading">Loading goals</string>
+    <string name="beeminder_no_active_goals">No active goals</string>
+    <string name="beeminder_load_failed">Unable to load Beeminder goals</string>
+    <string name="beeminder_stale">stale</string>
+    <string name="beeminder_offline">offline</string>
+    <string name="beeminder_active_count">%1$d active</string>
+    <string name="beeminder_active_count_status">%1$d active - %2$s</string>
+    <string name="beeminder_more_safe">+%1$d safe</string>
+    <string name="beeminder_due_now">due now</string>
+    <string name="beeminder_due_today">due today</string>
+    <string name="beeminder_due_tomorrow">due tomorrow</string>
+    <string name="beeminder_due_in_days">due in %1$d days</string>
     <string name="admin_permission_message">Omglauncher promises to use the accessibility permission responsibly. Omglauncher does not collect or share any data.</string>
     <string name="about">About</string>
     <string name="off">Off</string>

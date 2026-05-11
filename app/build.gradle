@@ -1,6 +1,14 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { stream ->
+        localProperties.load(stream)
+    }
+}
+
 android {
     compileSdk 35
 
@@ -22,6 +30,8 @@ android {
 
         resourceConfigurations += ["en", "ar", "de", "es-rES", "es-rUS", "fr", "he", "hr", "hu", "in", "it", "ja", "nl", "pl", "pt-rBR", "ru-rRU", "sv", "tr", "uk", "zh"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "BEEMINDER_CLIENT_ID", "\"${localProperties.getProperty("beeminder.clientId", "")}\""
+        buildConfigField "String", "BEEMINDER_REDIRECT_URI", "\"${localProperties.getProperty("beeminder.redirectUri", "omglauncher://beeminder/oauth")}\""
     }
 
     buildTypes {

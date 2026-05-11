@@ -816,6 +816,32 @@
                 </LinearLayout>
 
                 <FrameLayout
+                    android:id="@+id/beeminderTokenRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginTop="12dp">
+
+                    <TextView
+                        style="@style/TextSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="80dp"
+                        android:paddingVertical="8dp"
+                        android:text="@string/connect_beeminder"
+                        android:textColor="?attr/primaryColor" />
+
+                    <TextView
+                        android:id="@+id/configureBeeminderToken"
+                        style="@style/TextSmallBold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:padding="10dp"
+                        android:text="@string/off" />
+                </FrameLayout>
+
+                <FrameLayout
                     android:id="@+id/flSwipeDown"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
