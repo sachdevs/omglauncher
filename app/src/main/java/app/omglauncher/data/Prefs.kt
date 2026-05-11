@@ -48,6 +48,8 @@ class Prefs(context: Context) {
     private val BEEMINDER_GOALS_CACHE = "BEEMINDER_GOALS_CACHE"
     private val BEEMINDER_LAST_FETCH_TIME = "BEEMINDER_LAST_FETCH_TIME"
     private val LONG_PRESS_TIMER_DURATION_MS = "LONG_PRESS_TIMER_DURATION_MS"
+    private val WEATHER_CACHE = "WEATHER_CACHE"
+    private val WEATHER_LAST_FETCH_TIME = "WEATHER_LAST_FETCH_TIME"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -244,6 +246,14 @@ class Prefs(context: Context) {
     var beeminderLastFetchTime: Long
         get() = prefs.getLong(BEEMINDER_LAST_FETCH_TIME, 0L)
         set(value) = prefs.edit { putLong(BEEMINDER_LAST_FETCH_TIME, value).apply() }
+
+    var weatherCache: String
+        get() = prefs.getString(WEATHER_CACHE, "").toString()
+        set(value) = prefs.edit { putString(WEATHER_CACHE, value).apply() }
+
+    var weatherLastFetchTime: Long
+        get() = prefs.getLong(WEATHER_LAST_FETCH_TIME, 0L)
+        set(value) = prefs.edit { putLong(WEATHER_LAST_FETCH_TIME, value).apply() }
 
     var longPressTimerDurationMs: Long
         get() = prefs.getLong(LONG_PRESS_TIMER_DURATION_MS, Constants.LONG_PRESS_TIMER_DEFAULT_DURATION_MS)

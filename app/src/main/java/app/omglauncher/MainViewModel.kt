@@ -32,6 +32,7 @@ import app.omglauncher.data.Prefs
 import app.omglauncher.helper.BeeminderClient
 import app.omglauncher.helper.BeeminderPostWorker
 import app.omglauncher.helper.SingleLiveEvent
+import app.omglauncher.helper.WeatherClient
 import app.omglauncher.helper.WallpaperWorker
 import app.omglauncher.helper.formattedTimeSpent
 import app.omglauncher.helper.getAppsList
@@ -64,6 +65,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val launcherResetFailed = MutableLiveData<Boolean>()
     val homeAppAlignment = MutableLiveData<Int>()
     val screenTimeValue = MutableLiveData<String>()
+    val weatherValue = MutableLiveData<String>()
     val beeminderDashboardState = MutableLiveData<BeeminderDashboardState>()
     val beeminderTimerState = MutableLiveData<BeeminderTimerState>()
 
@@ -476,6 +478,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val viewTimeSpent = appContext.formattedTimeSpent(timeSpent)
         screenTimeValue.postValue(viewTimeSpent)
         prefs.screenTimeLastUpdated = endTime
+    }
+
+    fun fetchWeather() {
+        if (prefs.weatherLastFetchTime.hasBeenMinutes(30).not()) {
+            val cached = prefs.weatherCache
+            if (cached.isNotBlank()) weatherValue.postValue(cached)
+            return
+        }
+        viewModelScope.launch {
+            val result = WeatherClient.fetchWeather()
+            if (result != null) {
+                val text = result.format()
+                prefs.weatherCache = text
+                prefs.weatherLastFetchTime = System.currentTimeMillis()
+                weatherValue.postValue(text)
+            } else {
+                val cached = prefs.weatherCache
+                if (cached.isNotBlank()) weatherValue.postValue(cached)
+            }
+        }
     }
 
     fun toggleBeeminderTimer() {

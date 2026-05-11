@@ -226,6 +226,11 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         viewModel.screenTimeValue.observe(viewLifecycleOwner) {
             it?.let { binding.tvScreenTime.text = it }
         }
+        viewModel.weatherValue.observe(viewLifecycleOwner) {
+            if (it.isNullOrBlank()) return@observe
+            binding.weather.text = it
+            binding.weather.isVisible = prefs.dateTimeVisibility != Constants.DateTime.OFF
+        }
         viewModel.showRecentApps.observe(viewLifecycleOwner) {
             binding.recents.performClick()
         }
@@ -311,6 +316,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 dateText = getString(R.string.day_battery, dateText, battery)
         }
         binding.date.text = dateText.replace(".,", ",")
+
+        viewModel.fetchWeather()
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -895,7 +902,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         binding.blankPageLayout.setBackgroundColor(bgColor)
 
         listOf(
-            binding.clock, binding.date, binding.tvScreenTime,
+            binding.clock, binding.date, binding.weather, binding.tvScreenTime,
             binding.homeApp1, binding.homeApp2, binding.homeApp3, binding.homeApp4,
             binding.homeApp5, binding.homeApp6, binding.homeApp7, binding.homeApp8,
             binding.firstRunTips, binding.setDefaultLauncher,
