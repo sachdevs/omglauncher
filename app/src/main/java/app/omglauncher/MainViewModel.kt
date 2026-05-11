@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.UserHandle
 import android.os.UserManager
@@ -15,13 +17,20 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.lifecycle.Observer
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import app.omglauncher.data.AppModel
 import app.omglauncher.data.BeeminderDashboardState
+import app.omglauncher.data.BeeminderPostStatus
+import app.omglauncher.data.BeeminderTimerState
 import app.omglauncher.data.Constants
 import app.omglauncher.data.Prefs
 import app.omglauncher.helper.BeeminderClient
+import app.omglauncher.helper.BeeminderPostWorker
 import app.omglauncher.helper.SingleLiveEvent
 import app.omglauncher.helper.WallpaperWorker
 import app.omglauncher.helper.formattedTimeSpent
@@ -34,6 +43,8 @@ import app.omglauncher.helper.isPackageInstalled
 import app.omglauncher.helper.isPrivateSpaceLocked
 import app.omglauncher.helper.showToast
 import app.omglauncher.helper.usageStats.EventLogWrapper
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -54,6 +65,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val homeAppAlignment = MutableLiveData<Int>()
     val screenTimeValue = MutableLiveData<String>()
     val beeminderDashboardState = MutableLiveData<BeeminderDashboardState>()
+    val beeminderTimerState = MutableLiveData<BeeminderTimerState>()
 
     val privateSpaceApps = MutableLiveData<List<AppModel>?>()
     val privateSpaceLocked = MutableLiveData<Boolean>()
@@ -61,11 +73,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Suppress backToHomeScreen during Private Space lock/unlock auth
     var isPrivateSpaceToggling = false
+    private var beeminderTimerJob: Job? = null
 
     val showDialog = SingleLiveEvent<String>()
     val checkForMessages = SingleLiveEvent<Unit?>()
     val resetLauncherLiveData = SingleLiveEvent<Unit?>()
     val showRecentApps = SingleLiveEvent<Unit?>()
+
+    init {
+        resetBeeminderTimer()
+    }
 
     fun selectedApp(appModel: AppModel, flag: Int) {
         if (appModel is AppModel.PrivateSpaceHeader) return
@@ -461,6 +478,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.screenTimeLastUpdated = endTime
     }
 
+    fun toggleBeeminderTimer() {
+        val currentState = beeminderTimerState.value ?: defaultBeeminderTimerState()
+        if (currentState.postStatus != BeeminderPostStatus.IDLE) return
+        if (currentState.isRunning || currentState.remainingMs <= 0L) {
+            resetBeeminderTimer()
+        } else {
+            startBeeminderTimer()
+        }
+    }
+
+    private fun startBeeminderTimer() {
+        beeminderTimerJob?.cancel()
+
+        val durationMs = configuredBeeminderTimerDurationMs()
+        var remainingMs = durationMs
+        beeminderTimerState.value = BeeminderTimerState(
+            durationMs = durationMs,
+            remainingMs = remainingMs,
+            isRunning = true,
+        )
+
+        beeminderTimerJob = viewModelScope.launch {
+            while (remainingMs > 0L) {
+                delay(Constants.BEEMINDER_TIMER_TICK_MS)
+                remainingMs = (remainingMs - Constants.BEEMINDER_TIMER_TICK_MS).coerceAtLeast(0L)
+                beeminderTimerState.value =
+                    BeeminderTimerState(
+                        durationMs = durationMs,
+                        remainingMs = remainingMs,
+                        isRunning = remainingMs > 0L,
+                    )
+            }
+            postBeeminderCompletion()
+            playBeeminderTimerAlert()
+        }
+    }
+
+    private fun postBeeminderCompletion() {
+        val currentState = beeminderTimerState.value ?: return
+        beeminderTimerState.value = currentState.copy(postStatus = BeeminderPostStatus.POSTING)
+
+        val request = OneTimeWorkRequestBuilder<BeeminderPostWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+
+        val wm = WorkManager.getInstance(appContext)
+        wm.enqueueUniqueWork(BEEMINDER_POST_WORK, ExistingWorkPolicy.REPLACE, request)
+        wm.getWorkInfoByIdLiveData(request.id).observeForever(object : Observer<WorkInfo?> {
+            override fun onChanged(value: WorkInfo?) {
+                if (value == null) return
+                if (value.state == WorkInfo.State.SUCCEEDED) {
+                    val state = beeminderTimerState.value ?: return
+                    beeminderTimerState.postValue(state.copy(postStatus = BeeminderPostStatus.POSTED))
+                    wm.getWorkInfoByIdLiveData(request.id).removeObserver(this)
+                }
+            }
+        })
+    }
+
+    companion object {
+        private const val BEEMINDER_POST_WORK = "beeminder_post"
+    }
+
+    fun resetBeeminderTimer() {
+        beeminderTimerJob?.cancel()
+        beeminderTimerJob = null
+        beeminderTimerState.value = defaultBeeminderTimerState()
+    }
+
+    private fun defaultBeeminderTimerState(): BeeminderTimerState {
+        val durationMs = configuredBeeminderTimerDurationMs()
+        return BeeminderTimerState(
+            durationMs = durationMs,
+            remainingMs = durationMs,
+            isRunning = false,
+        )
+    }
+
+    private fun configuredBeeminderTimerDurationMs(): Long {
+        return prefs.longPressTimerDurationMs.coerceAtLeast(1000L)
+    }
+
+    private fun playBeeminderTimerAlert() {
+        val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            ?: return
+        val ringtone = RingtoneManager.getRingtone(appContext, alertUri) ?: return
+        ringtone.audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        ringtone.play()
+
+        viewModelScope.launch {
+            delay(Constants.BEEMINDER_TIMER_ALERT_MS)
+            ringtone.stop()
+        }
+    }
+
     fun saveBeeminderAccessToken(accessToken: String, username: String) {
         prefs.beeminderAccessToken = accessToken.trim()
         prefs.beeminderUsername = username.trim()
@@ -491,7 +612,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        beeminderDashboardState.value = cachedState ?: BeeminderDashboardState.Loading
+        beeminderDashboardState.value = if (force) BeeminderDashboardState.Loading else (cachedState ?: BeeminderDashboardState.Loading)
         viewModelScope.launch {
             try {
                 val goals = BeeminderClient.fetchActiveGoals(accessToken)

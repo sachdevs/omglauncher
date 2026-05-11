@@ -16,6 +16,15 @@ data class BeeminderGoalSummary(
         get() = title.ifBlank { slug }
 }
 
+enum class BeeminderPostStatus { IDLE, POSTING, POSTED }
+
+data class BeeminderTimerState(
+    val durationMs: Long,
+    val remainingMs: Long,
+    val isRunning: Boolean,
+    val postStatus: BeeminderPostStatus = BeeminderPostStatus.IDLE,
+)
+
 sealed class BeeminderDashboardState {
     data object NotConfigured : BeeminderDashboardState()
     data object Loading : BeeminderDashboardState()

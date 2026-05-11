@@ -18,6 +18,7 @@ object BeeminderClient {
         connection.requestMethod = "GET"
         connection.connectTimeout = 10000
         connection.readTimeout = 10000
+        connection.useCaches = false
         connection.doInput = true
         connection.setRequestProperty("Authorization", "Bearer $accessToken")
 

@@ -47,6 +47,7 @@ class Prefs(context: Context) {
     private val BEEMINDER_USERNAME = "BEEMINDER_USERNAME"
     private val BEEMINDER_GOALS_CACHE = "BEEMINDER_GOALS_CACHE"
     private val BEEMINDER_LAST_FETCH_TIME = "BEEMINDER_LAST_FETCH_TIME"
+    private val LONG_PRESS_TIMER_DURATION_MS = "LONG_PRESS_TIMER_DURATION_MS"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -120,6 +121,7 @@ class Prefs(context: Context) {
     private val IS_SHORTCUT_SWIPE_LEFT = "IS_SHORTCUT_SWIPE_LEFT"
     private val SHORTCUT_ID_SWIPE_RIGHT = "SHORTCUT_ID_SWIPE_RIGHT"
     private val IS_SHORTCUT_SWIPE_RIGHT = "IS_SHORTCUT_SWIPE_RIGHT"
+    private val BEEMINDER_PAGE_ACTIVE = "BEEMINDER_PAGE_ACTIVE"
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_FILENAME, 0)
 
@@ -242,6 +244,10 @@ class Prefs(context: Context) {
     var beeminderLastFetchTime: Long
         get() = prefs.getLong(BEEMINDER_LAST_FETCH_TIME, 0L)
         set(value) = prefs.edit { putLong(BEEMINDER_LAST_FETCH_TIME, value).apply() }
+
+    var longPressTimerDurationMs: Long
+        get() = prefs.getLong(LONG_PRESS_TIMER_DURATION_MS, Constants.LONG_PRESS_TIMER_DEFAULT_DURATION_MS)
+        set(value) = prefs.edit { putLong(LONG_PRESS_TIMER_DURATION_MS, value).apply() }
 
     var hiddenApps: MutableSet<String>
         get() = prefs.getStringSet(HIDDEN_APPS, mutableSetOf()) as MutableSet<String>
@@ -647,6 +653,10 @@ class Prefs(context: Context) {
             8 -> appActivityClassName8 = activityClassName
         }
     }
+
+    var beeminderPageActive: Boolean
+        get() = prefs.getBoolean(BEEMINDER_PAGE_ACTIVE, false)
+        set(value) = prefs.edit { putBoolean(BEEMINDER_PAGE_ACTIVE, value).apply() }
 
     fun updateAppActivityClassName(packageName: String, activityClassName: String) {
         for (i in 1..8) {

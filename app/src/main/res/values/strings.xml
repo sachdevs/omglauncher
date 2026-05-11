@@ -46,6 +46,13 @@
     <string name="beeminder_due_today">due today</string>
     <string name="beeminder_due_tomorrow">due tomorrow</string>
     <string name="beeminder_due_in_days">due in %1$d days</string>
+    <string name="beeminder_timer">Beeminder timer</string>
+    <string name="beeminder_timer_duration">Beeminder timer</string>
+    <string name="timer_duration_minutes" translatable="false">%1$dm</string>
+    <string name="timer_duration_seconds" translatable="false">%1$ds</string>
+    <string name="timer_duration_10m" translatable="false">10m</string>
+    <string name="timer_duration_15m" translatable="false">15m</string>
+    <string name="timer_duration_25m" translatable="false">25m</string>
     <string name="admin_permission_message">Omglauncher promises to use the accessibility permission responsibly. Omglauncher does not collect or share any data.</string>
     <string name="about">About</string>
     <string name="off">Off</string>

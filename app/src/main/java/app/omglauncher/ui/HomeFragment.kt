@@ -11,6 +11,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.text.TextUtils
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -24,6 +25,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.bundleOf
+import androidx.core.widget.TextViewCompat
 import androidx.core.view.isVisible
 import androidx.core.view.setPadding
 import androidx.fragment.app.Fragment
@@ -35,6 +37,8 @@ import app.omglauncher.R
 import app.omglauncher.data.AppModel
 import app.omglauncher.data.BeeminderDashboardState
 import app.omglauncher.data.BeeminderGoalSummary
+import app.omglauncher.data.BeeminderPostStatus
+import app.omglauncher.data.BeeminderTimerState
 import app.omglauncher.data.Constants
 import app.omglauncher.data.Prefs
 import app.omglauncher.databinding.FragmentHomeBinding
@@ -54,6 +58,7 @@ import app.omglauncher.helper.showToast
 import app.omglauncher.listener.OnSwipeTouchListener
 import app.omglauncher.listener.ViewSwipeTouchListener
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -65,6 +70,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     private lateinit var deviceManager: DevicePolicyManager
     private lateinit var leftBlankPageBackCallback: OnBackPressedCallback
     private var isLeftBlankPageVisible = false
+    private var isNight = false
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
@@ -92,14 +98,18 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
     override fun onResume() {
         super.onResume()
-        isLeftBlankPageVisible = false
-        leftBlankPageBackCallback.isEnabled = false
-        binding.blankPageLayout.visibility = View.GONE
-        binding.homeAppsLayout.visibility = View.VISIBLE
+        if (isLeftBlankPageVisible) {
+            restoreHomeFromLeftBlankPage()
+        }
+        applyDayNightColors()
         populateHomeScreen(false)
         viewModel.isOmglauncherDefault()
         if (prefs.showStatusBar) showStatusBar()
         else hideStatusBar()
+    }
+
+    override fun onPause() {
+        super.onPause()
     }
 
     override fun onClick(view: View) {
@@ -222,14 +232,17 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         viewModel.beeminderDashboardState.observe(viewLifecycleOwner) {
             populateBeeminderDashboard(it)
         }
+        viewModel.beeminderTimerState.observe(viewLifecycleOwner) {
+            updateBeeminderTimer(it)
+        }
     }
 
     private fun initSwipeTouchListener() {
         val context = requireContext()
         binding.mainLayout.setOnTouchListener(getSwipeGestureListener(context))
         binding.blankPageLayout.setOnTouchListener(getSwipeGestureListener(context))
-        binding.beeminderTopLayout.setOnTouchListener(getSwipeGestureListener(context))
-        binding.beeminderGoalsLayout.setOnTouchListener(getSwipeGestureListener(context))
+        binding.beeminderTopLayout.setOnTouchListener(getBeeminderSwipeGestureListener(context))
+        binding.beeminderGoalsLayout.setOnTouchListener(getBeeminderSwipeGestureListener(context))
         binding.blankPageBottomLayout.setOnTouchListener(getSwipeGestureListener(context))
         binding.homeApp1.setOnTouchListener(getViewSwipeTouchListener(context, binding.homeApp1))
         binding.homeApp2.setOnTouchListener(getViewSwipeTouchListener(context, binding.homeApp2))
@@ -252,6 +265,11 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         binding.setDefaultLauncher.setOnLongClickListener(this)
         binding.tvScreenTime.setOnClickListener(this)
         binding.tvScreenTime.setOnLongClickListener(this)
+        binding.beeminderTimer.setOnClickListener { viewModel.toggleBeeminderTimer() }
+        binding.beeminderTimer.setOnLongClickListener {
+            viewModel.resetBeeminderTimer()
+            true
+        }
     }
 
     private fun initLeftBlankPageBackHandler() {
@@ -489,6 +507,23 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         updateHomeFooterVisibility()
     }
 
+    private fun updateBeeminderTimer(state: BeeminderTimerState) {
+        binding.beeminderTimer.progress = state.remainingMs.toFloat() / state.durationMs.toFloat()
+        binding.beeminderTimer.timeText = formatBeeminderTimer(state.remainingMs)
+        binding.beeminderTimer.displayMode = when (state.postStatus) {
+            BeeminderPostStatus.IDLE -> TimerDisplayMode.TIMER
+            BeeminderPostStatus.POSTING -> TimerDisplayMode.SPINNER
+            BeeminderPostStatus.POSTED -> TimerDisplayMode.CHECKMARK
+        }
+    }
+
+    private fun formatBeeminderTimer(remainingMs: Long): String {
+        val totalSeconds = (remainingMs + 999L) / 1000L
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return "%d:%02d".format(Locale.US, minutes, seconds)
+    }
+
     private fun openSwipeLeftAppOrBlankPage() {
         if (!prefs.swipeLeftEnabled) return
 
@@ -512,12 +547,13 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     private fun populateBeeminderDashboard(state: BeeminderDashboardState) {
         binding.beeminderGoalsLayout.removeAllViews()
         binding.beeminderMessage.visibility = View.GONE
+        binding.beeminderLoading.visibility = View.GONE
         binding.beeminderTitle.text = getString(R.string.beeminder)
         binding.beeminderStatus.text = ""
 
         when (state) {
             BeeminderDashboardState.NotConfigured -> showBeeminderMessage(R.string.beeminder_not_configured)
-            BeeminderDashboardState.Loading -> showBeeminderMessage(R.string.beeminder_loading)
+            BeeminderDashboardState.Loading -> binding.beeminderLoading.visibility = View.VISIBLE
             is BeeminderDashboardState.Loaded -> populateBeeminderGoals(state)
             is BeeminderDashboardState.Error -> {
                 state.cached?.let { populateBeeminderGoals(it.copy(stale = true)) }
@@ -591,9 +627,17 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         row.addView(homeText(metaText, secondary = true).apply {
             gravity = Gravity.END
             maxLines = 1
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                this,
+                8,
+                18,
+                1,
+                TypedValue.COMPLEX_UNIT_SP
+            )
             layoutParams = LinearLayout.LayoutParams(
+                0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                0.75f
             ).apply {
                 marginStart = 8.dpToPx()
             }
@@ -619,7 +663,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
-            if (secondary) setTextColor(requireContext().getColor(R.color.blackTrans50))
+            val baseColor = if (isNight) Color.WHITE else Color.BLACK
+            setTextColor(if (secondary) (baseColor and 0x00FFFFFF) or 0x80000000.toInt() else baseColor)
         }
     }
 
@@ -636,8 +681,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         )
         return GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(2.dpToPx(), color)
+            setColor(color)
         }
     }
 
@@ -839,6 +883,50 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         requireActivity().recreate()
     }
 
+    private fun applyDayNightColors() {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        isNight = hour >= 19 || hour < 7
+
+        val bgColor = if (isNight) Color.BLACK else Color.WHITE
+        val textColor = if (isNight) Color.WHITE else Color.BLACK
+        val hintColor = if (isNight) 0xCCFFFFFF.toInt() else 0xCC000000.toInt()
+
+        binding.mainLayout.setBackgroundColor(bgColor)
+        binding.blankPageLayout.setBackgroundColor(bgColor)
+
+        listOf(
+            binding.clock, binding.date, binding.tvScreenTime,
+            binding.homeApp1, binding.homeApp2, binding.homeApp3, binding.homeApp4,
+            binding.homeApp5, binding.homeApp6, binding.homeApp7, binding.homeApp8,
+            binding.firstRunTips, binding.setDefaultLauncher,
+            binding.beeminderTitle, binding.beeminderStatus, binding.beeminderMessage
+        ).forEach { tv ->
+            tv.setTextColor(textColor)
+            tv.setHintTextColor(hintColor)
+        }
+
+        binding.beeminderTimer.setColors(textColor)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val controller = requireActivity().window.insetsController
+            val lightBars = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+            if (isNight) {
+                controller?.setSystemBarsAppearance(0, lightBars)
+            } else {
+                controller?.setSystemBarsAppearance(lightBars, lightBars)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = requireActivity().window.decorView.systemUiVisibility
+            @Suppress("DEPRECATION")
+            requireActivity().window.decorView.systemUiVisibility = if (isNight) {
+                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+            } else {
+                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+        }
+    }
+
     private fun openScreenTimeDigitalWellbeing() {
         if (prefs.screenTimeAppPackage.isNotBlank()) {
             launchApp(
@@ -915,6 +1003,30 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                     binding.lock.performClick()
                 else
                     lockPhone()
+            }
+
+            override fun onClick() {
+                super.onClick()
+                viewModel.checkForMessages.call()
+            }
+        }
+    }
+
+    private fun getBeeminderSwipeGestureListener(context: Context): View.OnTouchListener {
+        return object : OnSwipeTouchListener(context) {
+            override fun onSwipeRight() {
+                super.onSwipeRight()
+                openSwipeRightAppOrRestoreHome()
+            }
+
+            override fun onSwipeDown() {
+                super.onSwipeDown()
+                swipeDownAction()
+            }
+
+            override fun onLongClick() {
+                super.onLongClick()
+                viewModel.refreshBeeminderGoals(force = true)
             }
 
             override fun onClick() {

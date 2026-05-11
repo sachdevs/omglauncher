@@ -85,6 +85,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         populateDateTime()
         populateSwipeApps()
         populateBeeminderToken()
+        populateBeeminderTimerDuration()
         populateSwipeDownAction()
         populateActionHints()
         initClickListeners()
@@ -99,6 +100,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.dateTimeSelectLayout.visibility = View.GONE
         binding.appThemeSelectLayout.visibility = View.GONE
         binding.swipeDownSelectLayout.visibility = View.GONE
+        binding.beeminderTimerDurationSelectLayout.visibility = View.GONE
         if (view.id != R.id.textSizeMinus && view.id != R.id.textSizePlus) {
             if (binding.textSizesLayout.isVisible) {
                 binding.textSizesLayout.visibility = View.GONE
@@ -157,6 +159,10 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             R.id.swipeLeftApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_LEFT_APP)
             R.id.swipeRightApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_RIGHT_APP)
             R.id.beeminderTokenRow, R.id.configureBeeminderToken -> connectOrDisconnectBeeminder()
+            R.id.beeminderTimerDurationRow, R.id.beeminderTimerDuration -> binding.beeminderTimerDurationSelectLayout.visibility = View.VISIBLE
+            R.id.beeminderTimer10 -> updateBeeminderTimerDurationMs(10L * Constants.ONE_MINUTE_IN_MILLIS)
+            R.id.beeminderTimer15 -> updateBeeminderTimerDurationMs(15L * Constants.ONE_MINUTE_IN_MILLIS)
+            R.id.beeminderTimer25 -> updateBeeminderTimerDurationMs(25L * Constants.ONE_MINUTE_IN_MILLIS)
             R.id.swipeDownAction -> binding.swipeDownSelectLayout.visibility = View.VISIBLE
             R.id.notifications -> updateSwipeDownAction(Constants.SwipeDownAction.NOTIFICATIONS)
             R.id.search -> updateSwipeDownAction(Constants.SwipeDownAction.SEARCH)
@@ -232,6 +238,11 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.swipeRightApp.setOnClickListener(this)
         binding.beeminderTokenRow.setOnClickListener(this)
         binding.configureBeeminderToken.setOnClickListener(this)
+        binding.beeminderTimerDurationRow.setOnClickListener(this)
+        binding.beeminderTimerDuration.setOnClickListener(this)
+        binding.beeminderTimer10.setOnClickListener(this)
+        binding.beeminderTimer15.setOnClickListener(this)
+        binding.beeminderTimer25.setOnClickListener(this)
         binding.swipeDownAction.setOnClickListener(this)
         binding.search.setOnClickListener(this)
         binding.notifications.setOnClickListener(this)
@@ -645,6 +656,24 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.configureBeeminderToken.text = getString(
             if (prefs.beeminderAccessToken.isBlank()) R.string.off else R.string.on
         )
+    }
+
+    private fun populateBeeminderTimerDuration() {
+        binding.beeminderTimerDuration.text = formatTimerDuration(prefs.longPressTimerDurationMs)
+    }
+
+    private fun updateBeeminderTimerDurationMs(durationMs: Long) {
+        prefs.longPressTimerDurationMs = durationMs
+        binding.beeminderTimerDurationSelectLayout.visibility = View.GONE
+        populateBeeminderTimerDuration()
+        viewModel.resetBeeminderTimer()
+    }
+
+    private fun formatTimerDuration(durationMs: Long): String {
+        val minutes = (durationMs / Constants.ONE_MINUTE_IN_MILLIS).toInt()
+        if (minutes > 0) return getString(R.string.timer_duration_minutes, minutes)
+        val seconds = (durationMs / 1000L).toInt()
+        return getString(R.string.timer_duration_seconds, seconds)
     }
 
     private fun connectOrDisconnectBeeminder() {
